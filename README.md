@@ -8,7 +8,7 @@ Every bot you wish to run under this framework should be defined in its own laun
 ### The bot framework relies on:
 - Python 3.8+
 - discord.py 2.0 (pip install git+https://github.com/Rapptz/discord.py)
-### Optional, but necessary for using some cogs:
+### Optional, only necessary for using some cogs:
 - aiosqlite (for the database cog)
 - python-dateutil (for time_helper utils)
 - jishaku (always good to have)
