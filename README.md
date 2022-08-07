@@ -8,9 +8,9 @@ Every bot you wish to run under this framework should be defined in its own laun
 - Lots more control over the bot's lifetime, extension loading, commands, etc...
 - All bot boilerplate already done for you, you can focus on making cogs and commands.
 - Application command auto-syncing to Discord done in a smart way. You no longer need to care about when or how to sync. (This is configurable.)
-- Custom app_commands command tree that contains a plethora of functions for more control over what commands get synced and how exactly it's done. Also includes a custom appcommand cache (similar to other discord.py caches like for messages or members) that lets you access your server-side commands without having to fetch them.
+- Custom app-command tree that contains a plethora of functions for more control over what commands get synced and how exactly it's done. Also includes a custom appcommand cache (similar to other discord.py caches like for messages or members) that lets you access your server-side commands without having to fetch them.
 - Smarter cogs enriched with all kinds of features, including custom decorators. You can mark a function to be ran when the bot and cog are both ready, you can specify dependencies that a cog depends on and will not load without, you can get a list of commands of a specific type, etc... You can also pass your own config defined per-cog per-bot while reusing the same codebase.
-- Improved hybrid commands, which now only run in the same contexts in which the belonging app command would run, and other decorators that do not work on them out of the box have been made more compatible.
+- Improved hybrid commands, which now only run in the same contexts in which the underlying app command would run, and other decorators that do not work on them out of the box have now been made more compatible.
 - Decorators for marking an app command to be added either to the bot's main guild or all of its guilds, evaluated on runtime, which wasn't possible before.
 - Custom bot events, including on_full_load and on_console_input, the latter of which is especially useful for reading the console input during async runtime.
 - Lots of utilities ready for use, including a database cog (using aiosqlite) with many easy to use functions abstracting everything away from you.
