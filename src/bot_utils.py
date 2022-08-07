@@ -12,16 +12,16 @@ class PathHelper:
     def __init__(self, bot):
         self.bot = bot
     
-    def from_bot_dir(self, relative_path: str) -> str:
+    def in_bot_dir(self, relative_path: str) -> str:
         return os.path.join(self.bot.paths.bot_dir, relative_path)
     
-    def from_data_dir(self, relative_path: str) -> str:
+    def in_data_dir(self, relative_path: str) -> str:
         return os.path.join(self.bot.paths.data_dir, relative_path)
     
-    def from_resources_dir(self, relative_path: str) -> str:
+    def in_resources_dir(self, relative_path: str) -> str:
         return os.path.join(self.bot.paths.resources_dir, relative_path)
     
-    def from_extensions_dir(self, relative_path: str) -> str:
+    def in_extensions_dir(self, relative_path: str) -> str:
         return os.path.join(self.bot.paths.extensions_dir, relative_path)
 
 
@@ -70,7 +70,7 @@ class ResolveHelper:
         return resolved_guild
     
     
-    async def user(self, user, convert_member_to_user: bool = False) -> Optional[discord.User]:
+    async def user(self, user_id, convert_member_to_user: bool = False) -> Optional[discord.User]:
         """Safely resolves 'user' to a discord.User object.
         Firstly, the cache is checked, and if nothing is found,
         a fetch request is made. If a user is not found even after
@@ -84,33 +84,33 @@ class ResolveHelper:
         Otherwise a user ID will be expected.
         """
         
-        if not user:
+        if not user_id:
             return None
         
-        if isinstance(user, discord.User):
-            return user
-        if isinstance(user, discord.Member):
+        if isinstance(user_id, discord.User):
+            return user_id
+        if isinstance(user_id, discord.Member):
             if not convert_member_to_user:
-                return user
-            user = user.id
+                return user_id
+            user_id = user_id.id
         
-        resolved_user = self.bot.get_user(user)
-        if resolved_user:
-            return resolved_user
+        user = self.bot.get_user(user_id)
+        if user:
+            return user
         
         try:
-            resolved_user = await self.bot.fetch_user(user)
+            user = await self.bot.fetch_user(user_id)
         except:
             return None
         
-        return resolved_user
+        return user
     
     
     async def member(self, user, guild) -> Optional[discord.Member]:
         """Safely resolves 'user' to a discord.Member object.
         Returns a member object if a user is the given guild, otherwise returns None.
         
-        This function will do this as efficiently as possible.
+        The function will do this as efficiently as possible.
         
         user:
         Passing in None will return None.
@@ -127,7 +127,6 @@ class ResolveHelper:
             guild = self.bot.get_guild(guild)
             if not guild:
                 return None
-        
         
         if isinstance(user, discord.Member):
             if user.guild.id == guild.id:
@@ -148,8 +147,70 @@ class ResolveHelper:
         return member
     
     
-    #async only for consistency
-    async def role(self, role_id, guild) -> Optional[discord.Role]:
+    async def member_or_user(self, user, guild) -> Optional[Union[discord.User, discord.Member]]:
+        """Safely resolves 'user' to a discord.Member object if user is in the given guild,
+        otherwise resolves to discord.User object. If neither is possible, returns None.
+        
+        The function will do this as efficiently as possible.
+        
+        user:
+        Passing in None will return None.
+        Passing in an existing member will return it if it's from the passed in guild already,
+        otherwise it will be treated just like a user object.
+        Otherwise a user ID or a user object will be expected.
+        guild: Can be either discord.Guild or a plain guild ID. If None, then only
+        a user object will be possible to be returned
+        """
+        
+        if not user:
+            return None
+        
+        if not guild:
+            return await self.user(user, False)
+        
+        if not isinstance(guild, discord.Guild):
+            guild = self.bot.get_guild(guild)
+            if not guild:
+                return None
+        
+        resolved_user = None
+        
+        if isinstance(user, discord.Member):
+            if user.guild.id == guild.id:
+                return user
+            user = user.id
+        elif isinstance(user, discord.User):
+            resolved_user = user
+            user = user.id
+        
+        member = guild.get_member(user)
+        if member:
+            return member
+        
+        try:
+            member = await guild.fetch_member(user)
+        except:
+            pass
+        else:
+            if member:
+                return member
+        
+        if resolved_user:
+            return resolved_user
+        
+        resolved_user = self.bot.get_user(user)
+        if resolved_user:
+            return resolved_user
+        
+        try:
+            resolved_user = await self.bot.fetch_user(user)
+        except:
+            return None
+        
+        return resolved_user
+        
+    
+    async def role(self, role_id, guild, fetch_if_not_found: bool = False) -> Optional[discord.Role]:
         """Safely resolves 'role_id' to a discord.Role object.
         Returns a role object of a given guild, otherwise returns None.
         
@@ -158,6 +219,8 @@ class ResolveHelper:
         Passing in an existing role object will return it.
         Otherwise a role ID will be expected.
         guild: Can be either discord.Guild or a plain guild ID.
+        fetch_if_not_found: Will perform an additional roles fetch
+        from the guild if the role is not found in the cache. False by default.
         """
         
         if not role_id:
@@ -172,7 +235,19 @@ class ResolveHelper:
             if not guild:
                 return None
         
-        return guild.get_role(role_id)
+        role = guild.get_role(role_id)
+        if role or not fetch_if_not_found:
+            return role
+        
+        try:
+            roles = await guild.fetch_roles()
+            for role in roles:
+                if role.id == role_id:
+                    return role
+        except:
+            pass
+        
+        return None
     
     
     def is_channel(self, channel) -> bool:

@@ -13,7 +13,7 @@ Config template:
 
 
 async def setup(bot: SmartBot):
-    await bot.add_cog(TemplateCog(bot, __name__))
+    await bot.add_cog(TemplateCog(bot))
 
 async def teardown(bot: SmartBot):
     pass
@@ -21,22 +21,30 @@ async def teardown(bot: SmartBot):
 
 
 class TemplateCog(SmartCog):
-    #dependencies = []
-    
     """Template."""
-    def __init__(self, bot: SmartBot, ext_name: str):
-        super().__init__(bot, ext_name)
+    
+    #DEPENDENCIES = []
+    
+    
+    def __init__(self, bot: SmartBot):
+        super().__init__(bot)
         print("Initializing template cog!")
+
 
     async def cog_load(self):
         print("Template cog is async initialized!")
+        await super().cog_load()
+    
+    
+    async def cog_unload(self):
+        print("Async unloading template cog!")
+        await super().cog_unload()
+    
     
     @run_when_ready
     async def ready_init(self):
         print("Template cog is ready!")
     
-    async def cog_unload(self):
-        print("Async unloading template cog!")
     
     @commands.Cog.listener("on_console_input")
     async def console_listener(self, input_line):

@@ -25,7 +25,7 @@ Config template:
 
 
 async def setup(bot: SmartBot):
-    cog = PermissionsCog(bot, __name__)
+    cog = PermissionsCog(bot)
     bot.utils.perms = cog
     await bot.add_cog(cog)
 
@@ -37,8 +37,8 @@ async def teardown(bot: SmartBot):
 class PermissionsCog(SmartCog):
     """Utility cog implementing permission levels."""
 
-    def __init__(self, bot: SmartBot, ext_name: str):
-        super().__init__(bot, ext_name)
+    def __init__(self, bot: SmartBot):
+        super().__init__(bot)
 
 
     def _get_level(self, server_id: int, user_id: int, role_ids: list) -> int:

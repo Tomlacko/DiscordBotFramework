@@ -20,12 +20,15 @@ sys.path.append(BOT_DIR)
 sys.path.append(EXTENSIONS_DIR)
 
 
-
 from custom_errors import ExtensionNotRegistered
 
 from smart_bot import SmartBot
-from utils.common import get_exception_traceback, plural_suffix
-from utils.printing import new_empty_line_if_not_already, enable_printing_override, disable_printing_override
+from utils.common import get_exception_traceback
+from utils.formatting import plural_suffix
+from utils.printing_override import new_empty_line_if_not_already, enable_printing_override, disable_printing_override
+
+
+
 
 
 class BotLoader:
@@ -39,7 +42,7 @@ class BotLoader:
     - bot.is_quitting - True if the bot is currently shutting down
     - bot.was_interrupted - True if the shutdown was caused by keyboard interruption
     - bot.globaldata - holds custom global variables accessible from everywhere
-        -main_server_id
+    - bot.main_server_id - holds the id of the main guild that the bot is intended to operate in
     - bot.paths - holds paths to important bot directories or files
         .bot_dir, .data_dir, .extensions_dir, .resources_dir
     - bot.utils - extensions can implement bot utilities that get appened here
@@ -50,37 +53,36 @@ class BotLoader:
     - bot.log_handlers - dictionary of log handlers for the logging module
 
     Custom events:
-    - on_first_ready() - fired only the first time the bot gets ready, ignores reconnections
+    - on_full_ready() - fired only the first time the bot gets fully ready. in cogs, use a special decorator instead though
     - on_console_input(str_line) - fired when a line is entered into the console
     - on_cog_ready(cog_instance) - fired when a cog gets completely loaded
 
     Other:
-    (not yet implemented)
     - attemts to run nonexistent commands won't spam the console with errors
     - if an exception is raised inside an event handler,
       which is then handled with an exception handler,
       adding ".handled = true" to the exception will prevent it from also spamming the console
     """
 
-    def __init__(self, *,
-        prefix: str,
+    def __init__(self, *args,
         status_type: discord.ActivityType,
         status_message: str,
-        intents: discord.Intents,
         owner_id: int = None,
-        main_server_id: int,
         data_dir: str,
         use_builtin_help_command: bool = True,
-        #use_builtin_logging: bool = False
-    ):
+        allowed_mentions = discord.AllowedMentions(
+            users=True,
+            replied_user=True,
+            roles=False,
+            everyone=False
+        ),
+    **kwargs):
         enable_printing_override()
 
         new_empty_line_if_not_already()
         print("--------------------------")
         print("--- Setting up the bot ---")
         new_empty_line_if_not_already()
-
-        #self.use_builtin_logging = use_builtin_logging
 
         self.exts_registered = []
         self.exts_to_load = []
@@ -97,21 +99,13 @@ class BotLoader:
         self.bot_dir = BOT_DIR
         self.extensions_dir = EXTENSIONS_DIR
         self.resources_dir = STATIC_RESOURCES_DIR
-
+        
         bot_args = {
-            "command_prefix": prefix,
             "activity": discord.Activity(
                 type=status_type,
                 name=status_message
             ),
-            "intents": intents,
-            "allowed_mentions": discord.AllowedMentions(
-                users=True,
-                replied_user=True,
-                roles=False,
-                everyone=False
-            ),
-            "main_server_id": main_server_id,
+            "allowed_mentions": allowed_mentions,
             "bot_dir": self.bot_dir,
             "data_dir": self.data_dir,
             "extensions_dir": self.extensions_dir,
@@ -123,33 +117,21 @@ class BotLoader:
         if not use_builtin_help_command:
             bot_args["help_command"] = None
         
-
+        kwargs.update(bot_args)
+        
         #INSTANTIATE THE BOT
-        self.bot = SmartBot(**bot_args)
-        
-
-        #hook global bot events:
-
-        # @self.bot.event
-        # async def on_command_error(ctx: commands.Context, error):
-        #     if isinstance(error, commands.CommandNotFound):
-        #         return
-            
-        #     #custom attribute
-        #     if hasattr(error, "handled") and error.handled:
-        #         return
-            
-        #     raise error
+        self.bot = SmartBot(*args, **kwargs)
+    
         
 
 
-    def from_bot_dir(self, relative_path):
+    def in_bot_dir(self, relative_path):
         return os.path.join(self.bot_dir, relative_path)
-    def from_data_dir(self, relative_path):
+    def in_data_dir(self, relative_path):
         return os.path.join(self.data_dir, relative_path)
-    def from_extensions_dir(self, relative_path):
+    def in_extensions_dir(self, relative_path):
         return os.path.join(self.extensions_dir, relative_path)
-    def from_resources_dir(self, relative_path):
+    def in_resources_dir(self, relative_path):
         return os.path.join(self.resources_dir, relative_path)
 
 
@@ -291,7 +273,6 @@ class BotLoader:
         return True
 
 
-    
 
     def try_start_bot(self, token: str, *, reconnect: bool = True) -> bool:
         enable_printing_override()
@@ -309,9 +290,17 @@ class BotLoader:
 
             return True
         
+        
+        async def bot_before_full_ready(bot: SmartBot) -> None:
+            if bot.should_sync_commands_on_start():
+                new_empty_line_if_not_already()
+                print("Syncing AppCommands... (this might take a while)")
+
 
         @self.bot.event
-        async def on_first_ready():
+        async def on_full_ready():
+            if self.bot.should_sync_commands_on_start():
+                print(f"Combined total of {len(self.bot.tree.app_commands_cache.values())} AppCommands have been uploaded to Discord.")
             new_empty_line_if_not_already()
             print("--- Done, bot fully loaded! (Type 'q', 'quit' or 'exit' to stop it.) ---")
             new_empty_line_if_not_already()
@@ -319,14 +308,18 @@ class BotLoader:
 
         async def bot_shutdown_hook(bot: SmartBot) -> None:
             #move onto another line and write this after interuption signal is received in the console
+            
             if bot.was_interrupted:
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.2) #make sure that ^C shows up first in the console
                 print(" [Interrupt signal received]")
                 print("Gracefully shutting down the bot...")
             elif bot.is_loaded:
                 print("Stopping the bot...")
             else:
                 print("Bot startup cancelled.")
+            
+            if bot.should_sync_commands_on_quit():
+                print("(Un)syncing commands... (this might take a while)")
             new_empty_line_if_not_already()
         
 
@@ -344,6 +337,7 @@ class BotLoader:
             token,
             before_start_coro=bot_setup_handler,
             before_quit_coro=bot_shutdown_hook,
+            before_full_ready_coro=bot_before_full_ready,
             console_input_coro=console_handler,
             reconnect=reconnect
         )
