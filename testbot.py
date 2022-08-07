@@ -5,7 +5,7 @@ from src.bot_loader import BotLoader, path_from_current_dir
 
 
 
-TOKEN = "OTIzMjg1NDUyNTQ5NjgxMjIz.GyKatw.P1KkPsBd1suA1rCFB9fYJ_V_a5-5R-Rl4SRYIs"
+TOKEN = "PUT_YOUR_TOKEN_HERE"
 
 botloader = BotLoader(
     command_prefix = "%",
